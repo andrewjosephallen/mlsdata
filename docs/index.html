@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SORARE MLS DATA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- CRT Scanline Overlay -->
+  <div class="crt-overlay"></div>
+
+  <!-- Top Navigation Bar -->
+  <header class="top-bar">
+    <a href="#/" class="top-bar__logo">SORARE_MLS_DATA</a>
+    <div class="top-bar__search" id="topbar-search-container">
+      <input
+        type="text"
+        class="top-bar__search-input"
+        id="topbar-search-input"
+        placeholder="search players..."
+        autocomplete="off"
+        spellcheck="false"
+      >
+      <div class="search-dropdown" id="topbar-search-dropdown"></div>
+    </div>
+    <span class="top-bar__status">[SYSTEM ONLINE]</span>
+  </header>
+
+  <!-- Main Content Area -->
+  <main id="app"></main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <span>===============================================================================</span>
+    <div class="footer__content">
+      <span class="text-muted">sorare-mls-data v0.1.0</span>
+      <span class="text-muted">// no affiliation with sorare.com</span>
+      <span class="text-muted">data: mock</span>
+    </div>
+  </footer>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/mock-data.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/home.js"></script>
+  <script src="js/player.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
