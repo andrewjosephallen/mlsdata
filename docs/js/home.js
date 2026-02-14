@@ -5,7 +5,6 @@
 function renderHome() {
   const app = document.getElementById("app");
 
-  const recentSales = getRecentSales(8);
   const isLive = API.isConfigured();
 
   app.innerHTML = `
@@ -40,11 +39,13 @@ function renderHome() {
 
     <!-- Info Grid -->
     <div class="info-grid">
-      <!-- Market Overview -->
+      <!-- 24 Hour Market Overview -->
       <div class="terminal-window">
-        <div class="terminal-window__header">+--- MARKET OVERVIEW ---+</div>
-        <div class="terminal-window__body">
-          <div class="stat-row">
+        <div class="terminal-window__header">+--- 24 HOUR MARKET OVERVIEW ---+</div>
+        <div class="terminal-window__body" id="market-overview">
+          ${isLive
+            ? '<p class="text-muted" style="font-size: 0.8rem;">> loading market data...</p>'
+            : `<div class="stat-row">
             <span class="stat-row__label">24h volume</span>
             <span class="stat-row__value text-amber">142.8 ETH</span>
           </div>
@@ -57,38 +58,28 @@ function renderHome() {
             <span class="stat-row__value">0.077 ETH</span>
           </div>
           <div class="stat-row">
-            <span class="stat-row__label">active listings</span>
-            <span class="stat-row__value">24,391</span>
-          </div>
-          <div class="stat-row">
             <span class="stat-row__label">unique buyers</span>
             <span class="stat-row__value">612</span>
           </div>
           <div class="stat-row">
+            <span class="stat-row__label">unique sellers</span>
+            <span class="stat-row__value">489</span>
+          </div>
+          <div class="stat-row">
             <span class="stat-row__label">market trend</span>
             <span class="stat-row__value" style="color: var(--primary);">▲ +3.2%</span>
-          </div>
+          </div>`
+          }
         </div>
       </div>
 
-      <!-- Recent Sales -->
+      <!-- Top Auctions (24H) -->
       <div class="terminal-window">
-        <div class="terminal-window__header">+--- RECENT SALES ---+</div>
-        <div class="terminal-window__body" id="recent-sales">
-          ${
-            isLive
-              ? '<p class="text-muted" style="font-size: 0.8rem;">> loading recent sales...</p>'
-              : recentSales
-                  .map(
-                    (sale) => `
-            <div class="ticker-item">
-              <span>${sale.playerName}</span>
-              <span class="text-muted"> // ${sale.scarcity}</span>
-              <span class="ticker-item__price"> ${formatSalePrice(sale, "eth")}</span>
-            </div>
-          `,
-                  )
-                  .join("")
+        <div class="terminal-window__header">+--- TOP AUCTIONS (24H) ---+</div>
+        <div class="terminal-window__body" id="top-auctions">
+          ${isLive
+            ? '<p class="text-muted" style="font-size: 0.8rem;">> loading top auctions...</p>'
+            : '<p class="text-muted" style="font-size: 0.8rem;">> requires live API</p>'
           }
         </div>
       </div>
@@ -116,28 +107,18 @@ function renderHome() {
         </div>
       </div>
 
-      <!-- Quick Links -->
+      <!-- Quick Access — Most Traded -->
       <div class="terminal-window">
-        <div class="terminal-window__header">+--- QUICK ACCESS ---+</div>
+        <div class="terminal-window__header">+--- MOST TRADED (24H) ---+</div>
         <div class="terminal-window__body" id="quick-access">
-          <p class="text-muted" style="font-size: 0.8rem; margin-bottom: 0.5rem;">
-            > ${isLive ? "loading players..." : "top searched players:"}
-          </p>
-          ${
-            !isLive
-              ? PLAYERS.slice(0, 6)
-                  .map(
-                    (p) => `
+          ${isLive
+            ? '<p class="text-muted" style="font-size: 0.8rem;">> loading most traded...</p>'
+            : `<p class="text-muted" style="font-size: 0.8rem; margin-bottom: 0.5rem;">> top searched players:</p>
+          ${PLAYERS.slice(0, 6).map((p) => `
             <div style="padding: 0.25rem 0;">
-              <a href="#/player/${p.slug}" style="font-size: 0.8rem;">
-                > ${p.name}
-              </a>
+              <a href="#/player/${p.slug}" style="font-size: 0.8rem;">> ${p.name}</a>
               <span class="text-muted" style="font-size: 0.75rem;"> // ${p.club}</span>
-            </div>
-          `,
-                  )
-                  .join("")
-              : ""
+            </div>`).join("")}`
           }
         </div>
       </div>
@@ -185,33 +166,11 @@ function renderHome() {
 
   // If live, fetch real data for all panels
   if (isLive) {
-    // Populate quick access + player count
+    // Player index (for search + player count)
     API.getPlayerIndex()
       .then((players) => {
         const countEl = document.getElementById("player-count");
         if (countEl) countEl.textContent = players.length;
-
-        const quickEl = document.getElementById("quick-access");
-        if (quickEl) {
-          const top = players.slice(0, 8);
-          quickEl.innerHTML = `
-          <p class="text-muted" style="font-size: 0.8rem; margin-bottom: 0.5rem;">
-            > recently traded players:
-          </p>
-          ${top
-            .map(
-              (p) => `
-            <div style="padding: 0.25rem 0;">
-              <a href="#/player/${p.slug}" style="font-size: 0.8rem;">
-                > ${p.name}
-              </a>
-              <span class="text-muted" style="font-size: 0.75rem;"> // ${p.team}</span>
-            </div>
-          `,
-            )
-            .join("")}
-        `;
-        }
       })
       .catch((err) => {
         console.error("Failed to load player index:", err);
@@ -219,39 +178,120 @@ function renderHome() {
         if (countEl) countEl.textContent = "ERR";
       });
 
-    // Populate recent sales from real data
-    API.fetchTokenPrices(null, null, { limit: 8 })
+    // 24h Market Overview
+    API.fetchMarketOverview24h()
       .then((data) => {
-        const salesEl = document.getElementById("recent-sales");
-        if (!salesEl) return;
-
-        const sales = data.rows.map((r) => API.normalizeSale(r));
-        salesEl.innerHTML = sales
-          .map((sale) => {
-            const price =
-              sale.prices.eth != null
-                ? sale.prices.eth.toFixed(4) + " ETH"
-                : sale.prices.usd != null
-                  ? "$" + sale.prices.usd.toFixed(2)
-                  : "—";
-            return `
-          <div class="ticker-item">
-            <a href="#/player/${sale.playerSlug || ""}" style="text-decoration: none; color: inherit;">
-              <span>${sale.playerName || "—"}</span>
-            </a>
-            <span class="text-muted"> // ${sale.rarity || "—"}</span>
-            <span class="ticker-item__price"> ${price}</span>
+        const el = document.getElementById("market-overview");
+        if (!el) return;
+        const trendPct = data.trend_pct != null ? data.trend_pct : 0;
+        const trendDir = trendPct >= 0 ? "▲" : "▼";
+        const trendColor = trendPct >= 0 ? "var(--primary)" : "var(--error)";
+        el.innerHTML = `
+          <div class="stat-row">
+            <span class="stat-row__label">24h volume</span>
+            <span class="stat-row__value text-amber">${data.volume_eth != null ? data.volume_eth.toFixed(2) + ' ETH' : '—'}</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-row__label">cards sold</span>
+            <span class="stat-row__value">${data.cards_sold != null ? data.cards_sold.toLocaleString() : '—'}</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-row__label">avg price</span>
+            <span class="stat-row__value">${data.avg_price_eth != null ? data.avg_price_eth.toFixed(4) + ' ETH' : '—'}</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-row__label">unique buyers</span>
+            <span class="stat-row__value">${data.unique_buyers != null ? data.unique_buyers.toLocaleString() : '—'}</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-row__label">unique sellers</span>
+            <span class="stat-row__value">${data.unique_sellers != null ? data.unique_sellers.toLocaleString() : '—'}</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-row__label">market trend</span>
+            <span class="stat-row__value" style="color: ${trendColor};">${trendDir} ${Math.abs(trendPct).toFixed(1)}%</span>
           </div>
         `;
-          })
-          .join("");
       })
       .catch((err) => {
-        console.error("Failed to load recent sales:", err);
-        const salesEl = document.getElementById("recent-sales");
-        if (salesEl)
-          salesEl.innerHTML =
-            '<p class="text-muted" style="font-size: 0.8rem;">> failed to load sales [ERR]</p>';
+        console.error("Failed to load market overview:", err);
+        const el = document.getElementById("market-overview");
+        if (el) el.innerHTML = '<p class="text-muted" style="font-size: 0.8rem;">> failed to load market data [ERR]</p>';
+      });
+
+    // Top Auctions (24H) — 4 quadrants
+    API.fetchTopAuctions24h()
+      .then((data) => {
+        const el = document.getElementById("top-auctions");
+        if (!el) return;
+        const scarcities = [
+          { key: 'limited', label: 'Limited', color: '#ffb000' },
+          { key: 'rare', label: 'Rare', color: '#ff3333' },
+          { key: 'super_rare', label: 'Super Rare', color: '#3b82f6' },
+          { key: 'unique', label: 'Unique', color: '#a855f7' },
+        ];
+        el.innerHTML = '<div class="auction-quadrants">' + scarcities.map((s) => {
+          const sale = data[s.key];
+          if (!sale) {
+            return `
+              <div class="auction-quadrant" style="border-color: ${s.color}30;">
+                <div class="auction-quadrant__header" style="color: ${s.color};">${s.label}</div>
+                <p class="text-muted" style="font-size: 0.75rem; text-align: center; padding: 1rem 0;">> no auctions</p>
+              </div>`;
+          }
+          const priceEth = sale.price_eth != null ? sale.price_eth.toFixed(4) + ' ETH' : '—';
+          const priceUsd = sale.usd_cents != null ? '$' + (sale.usd_cents / 100).toFixed(2) : '';
+          const serial = sale.serial_number ? '#' + sale.serial_number + '/' + (sale.supply || '?') : '';
+          const name = sale.player_display_name || _slugToDisplayName(sale.player_slug);
+          return `
+            <div class="auction-quadrant" style="border-color: ${s.color}30;">
+              <div class="auction-quadrant__header" style="color: ${s.color};">${s.label}</div>
+              <a href="#/player/${sale.player_slug}" class="auction-quadrant__player">${name}</a>
+              <div class="auction-quadrant__price" style="color: ${s.color};">${priceEth}</div>
+              ${priceUsd ? `<div class="auction-quadrant__usd text-muted">${priceUsd}</div>` : ''}
+              <div class="auction-quadrant__meta text-muted">${formatSeasonYear(sale.season_year, sale.team_name)} ${serial}</div>
+            </div>`;
+        }).join('') + '</div>';
+      })
+      .catch((err) => {
+        console.error("Failed to load top auctions:", err);
+        const el = document.getElementById("top-auctions");
+        if (el) el.innerHTML = '<p class="text-muted" style="font-size: 0.8rem;">> failed to load auctions [ERR]</p>';
+      });
+
+    // Most Traded (24H) — Quick Access
+    API.fetchMostTraded24h(8)
+      .then((data) => {
+        const el = document.getElementById("quick-access");
+        if (!el) return;
+        const players = data.players || [];
+        if (players.length === 0) {
+          el.innerHTML = '<p class="text-muted" style="font-size: 0.8rem;">> no trades in past 24h</p>';
+          return;
+        }
+        el.innerHTML = `
+          <p class="text-muted" style="font-size: 0.8rem; margin-bottom: 0.5rem;">> most traded in 24h:</p>
+          ${players.map((p) => {
+            const name = p.player_display_name || _slugToDisplayName(p.player_slug);
+            const vol = p.total_volume_eth != null ? p.total_volume_eth.toFixed(4) + ' ETH' : '';
+            return `
+            <div style="padding: 0.25rem 0; display: flex; justify-content: space-between; align-items: baseline;">
+              <div>
+                <a href="#/player/${p.player_slug}" style="font-size: 0.8rem;">> ${name}</a>
+                <span class="text-muted" style="font-size: 0.75rem;"> // ${p.team_name || '—'}</span>
+              </div>
+              <div style="text-align: right; white-space: nowrap;">
+                <span style="font-size: 0.75rem; color: var(--secondary);">${p.sale_count} sales</span>
+                ${vol ? `<span class="text-muted" style="font-size: 0.7rem;"> (${vol})</span>` : ''}
+              </div>
+            </div>`;
+          }).join('')}
+        `;
+      })
+      .catch((err) => {
+        console.error("Failed to load most traded:", err);
+        const el = document.getElementById("quick-access");
+        if (el) el.innerHTML = '<p class="text-muted" style="font-size: 0.8rem;">> failed to load most traded [ERR]</p>';
       });
   }
 }
@@ -318,6 +358,13 @@ function initSearchOn(input, dropdown, container, opts = {}) {
       dropdown.classList.remove("active");
       input.blur();
       highlightIndex = -1;
+    }
+  });
+
+  input.addEventListener("focus", () => {
+    const query = input.value.trim();
+    if (query && dropdown.innerHTML.trim()) {
+      dropdown.classList.add("active");
     }
   });
 

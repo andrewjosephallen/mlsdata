@@ -412,6 +412,25 @@ a:hover {
   margin-bottom: 0.75rem;
   padding: 0.15rem 0.3rem;
 }
+.player-header__info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.player-header__photo {
+  flex-shrink: 0;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid var(--border);
+  background: var(--bg);
+}
+.player-header__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
 .player-header__name {
   font-size: 1.5rem;
   margin-bottom: 0.25rem;
@@ -419,6 +438,14 @@ a:hover {
 .player-header__meta {
   font-size: 0.85rem;
   color: var(--muted);
+}
+.player-header__flag,
+.player-header__team-logo {
+  width: 16px;
+  height: 16px;
+  vertical-align: middle;
+  margin-right: 2px;
+  object-fit: contain;
 }
 
 /* --- Player Page Tabs --- */
@@ -528,10 +555,12 @@ a:hover {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  width: 100%;
 }
 
 .filter-group {
   display: flex;
+  flex: 1;
   align-items: center;
   border: 1px solid var(--border);
 }
@@ -545,10 +574,11 @@ a:hover {
 
 /* --- Shared Filter Button --- */
 .filter-btn {
-  padding: 0.3rem 0.45rem;
+  flex: 1;
+  padding: 0.4rem 0.5rem;
   text-align: center;
   font-family: var(--font);
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -655,6 +685,52 @@ a:hover {
 }
 .sales-table tr:hover td {
   background: rgba(31, 82, 31, 0.1);
+}
+
+/* --- Top Auctions Quadrants --- */
+.auction-quadrants {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.auction-quadrant {
+  border: 1px solid;
+  padding: 0.75rem;
+  text-align: center;
+}
+
+.auction-quadrant__header {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 0.4rem;
+}
+
+.auction-quadrant__player {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.auction-quadrant__price {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.auction-quadrant__usd {
+  font-size: 0.7rem;
+  margin-top: 0.1rem;
+}
+
+.auction-quadrant__meta {
+  font-size: 0.7rem;
+  margin-top: 0.25rem;
 }
 
 /* --- Progress Bar (ASCII style) --- */

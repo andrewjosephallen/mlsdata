@@ -54,7 +54,7 @@ const priceCache = {};
 let loadingInterval = null;
 
 function trunc(str, max) {
-  return str.length > max ? str.slice(0, max - 1) + '…' : str;
+  return str.length > max ? str.slice(0, max - 1) + "…" : str;
 }
 
 function getFromDate(rangeKey) {
@@ -133,34 +133,26 @@ function renderPlayer(slug) {
   currentZoomRange = null;
 
   const isLive = API.isConfigured();
-  const displayName = player ? player.name : slug.replace(/-/g, " ");
 
-  // Build meta line — handle both mock player fields and real API player fields
-  const posArr = player
-    ? Array.isArray(player.position)
-      ? player.position
-      : [player.position]
-    : [];
-  const posStr = posArr.filter(Boolean).join("/") || "—";
-  const teamStr = player ? player.club || player.team || "—" : "—";
-  const extras = player
-    ? [
-        player.league,
-        player.nationality,
-        player.age ? `age ${player.age}` : null,
-      ]
-        .filter(Boolean)
-        .join(" // ")
-    : "";
+  // Immediate data: mock player or player index fallback
+  const indexPlayer = API._playerIndex?.find(p => p.slug === slug);
+  const displayName = player ? player.name
+    : indexPlayer ? indexPlayer.name
+    : _slugToDisplayName(slug);
 
   app.innerHTML = `
     <!-- Back Nav -->
     <div class="player-header">
       <a href="#/" class="player-header__back">&lt; cd ..</a>
-      <h1 class="player-header__name">${displayName}</h1>
-      <div class="player-header__meta">
-        ${posStr} // ${teamStr}${extras ? " // " + extras : ""}
-        ${isLive ? '<span style="color:var(--primary);"> [LIVE]</span>' : '<span class="text-muted"> [MOCK]</span>'}
+      <div class="player-header__info">
+        <div class="player-header__photo" id="player-photo"></div>
+        <div>
+          <h1 class="player-header__name" id="player-name">${displayName}</h1>
+          <div class="player-header__meta" id="player-meta">
+            ${isLive ? '> loading player info...' : _buildMetaLine(player, null)}
+            ${isLive ? '<span style="color:var(--primary);"> [LIVE]</span>' : '<span class="text-muted"> [MOCK]</span>'}
+          </div>
+        </div>
       </div>
     </div>
 
@@ -192,8 +184,93 @@ function renderPlayer(slug) {
     <div id="prices-tab" class="tab-pane" style="display:none"></div>
   `;
 
+  // Hydrate header: use player index immediately, then fetch full details
+  if (isLive) {
+    // Immediate: populate from player index if available
+    if (indexPlayer) {
+      _hydratePlayerHeader(indexPlayer.name, {
+        position: indexPlayer.position,
+        team: indexPlayer.team,
+        pictureUrl: indexPlayer.pictureUrl,
+      });
+    }
+    // Async: fetch full player profile for age, country, flags, etc.
+    API.fetchPlayer(slug)
+      .then(data => {
+        const posStr = Array.isArray(data.position)
+          ? data.position.join('/') : (data.position || '');
+        _hydratePlayerHeader(data.player_display_name, {
+          position: posStr,
+          team: data.team_name,
+          teamPictureUrl: data.team_picture_url,
+          age: data.age,
+          country: data.country,
+          countryFlagUrl: data.country_flag_url,
+          pictureUrl: data.picture_url,
+        });
+        // Update the name in case it's different from index
+        const nameEl = document.getElementById('player-name');
+        if (nameEl) nameEl.textContent = data.player_display_name || displayName;
+      })
+      .catch(err => {
+        console.warn('[PLAYER] fetchPlayer failed:', err.message);
+        // Index fallback is already rendered, so just log
+      });
+  }
+
   initTabs(slug, player);
   renderOverviewContent(player);
+}
+
+/**
+ * Build the meta line string from a mock player object.
+ */
+function _buildMetaLine(player, _extra) {
+  if (!player) return '—';
+  const posArr = Array.isArray(player.position) ? player.position : [player.position];
+  const posStr = posArr.filter(Boolean).join('/') || '—';
+  const teamStr = player.club || player.team || '—';
+  const extras = [
+    player.league,
+    player.nationality,
+    player.age ? `age ${player.age}` : null,
+  ].filter(Boolean).join(' // ');
+  return posStr + ' // ' + teamStr + (extras ? ' // ' + extras : '');
+}
+
+/**
+ * Hydrate the player header DOM with profile data.
+ */
+function _hydratePlayerHeader(name, data) {
+  const metaEl = document.getElementById('player-meta');
+  const photoEl = document.getElementById('player-photo');
+  const isLive = API.isConfigured();
+
+  if (metaEl) {
+    const parts = [];
+    if (data.position) parts.push(data.position);
+    if (data.team) {
+      const teamHtml = data.teamPictureUrl
+        ? `<img src="${data.teamPictureUrl}" class="player-header__team-logo" alt=""> ${data.team}`
+        : data.team;
+      parts.push(teamHtml);
+    }
+    if (data.country) {
+      const countryHtml = data.countryFlagUrl
+        ? `<img src="${data.countryFlagUrl}" class="player-header__flag" alt=""> ${data.country}`
+        : data.country;
+      parts.push(countryHtml);
+    }
+    if (data.age) parts.push(`age ${data.age}`);
+    const liveTag = isLive
+      ? '<span style="color:var(--primary);"> [LIVE]</span>'
+      : '<span class="text-muted"> [MOCK]</span>';
+    metaEl.innerHTML = (parts.join(' // ') || '—') + ' ' + liveTag;
+  }
+
+  if (photoEl && data.pictureUrl) {
+    photoEl.innerHTML = `<img src="${data.pictureUrl}" alt="${name}" class="player-header__img">`;
+  }
 }
 
 function initTabs(slug, player) {
@@ -696,9 +773,9 @@ function filterSales(sales, timeRange, txType, collection) {
   }
   if (collection && collection !== "all") {
     if (collection === "in_season") {
-      filtered = filtered.filter((s) => s.seasonYear === MLS_INSEASON_YEAR);
+      filtered = filtered.filter((s) => isInSeason(s.seasonYear, s.teamName));
     } else {
-      filtered = filtered.filter((s) => s.seasonYear !== MLS_INSEASON_YEAR);
+      filtered = filtered.filter((s) => !isInSeason(s.seasonYear, s.teamName));
     }
   }
   return filtered;
@@ -831,9 +908,8 @@ function renderPlayerStats(sales, currency, colors) {
   `;
 }
 
-function renderPriceChart(sales, colors, label, currency) {
+function renderPriceChart(sales, colors, _label, currency) {
   const ctx = document.getElementById("price-chart");
-  const curr = CURRENCIES[currency] || CURRENCIES.eth;
 
   if (playerChart) {
     playerChart.destroy();
@@ -842,39 +918,96 @@ function renderPriceChart(sales, colors, label, currency) {
 
   if (sales.length === 0) return;
 
-  const chartData = sales.map((s) => ({
+  // All data for the area fill (invisible line, visible fill)
+  const allData = sales.map((s) => ({
     x: s.occurredAt || s.date,
     y: getSalePrice(s, currency) ?? 0,
   }));
 
+  // Fixed-order tx type definitions (always show all three in legend)
+  const txDefs = [
+    {
+      key: "auction",
+      label: "Auction",
+      style: "triangle",
+      shade: colors.line,
+      borderShade: colors.line,
+    },
+    {
+      key: "secondary",
+      label: "Secondary",
+      style: "circle",
+      shade: colors.dot,
+      borderShade: colors.dot,
+    },
+    {
+      key: "instant_buy",
+      label: "Instant Buy",
+      style: "circle",
+      shade: "transparent",
+      borderShade: colors.line,
+    },
+  ];
+
+  // Group sales by tx type
+  const txGroups = { auction: [], secondary: [], instant_buy: [] };
+  sales.forEach((s, i) => {
+    const type = s.txType || "secondary";
+    const group = txGroups[type] || txGroups.secondary;
+    group.push({ ...allData[i], _saleIdx: i });
+  });
+
+  const pointDatasets = txDefs.map((def) => ({
+    label: def.label,
+    data: txGroups[def.key],
+    showLine: false,
+    fill: false,
+    pointStyle: def.style,
+    pointBackgroundColor: def.shade,
+    pointBorderColor: def.borderShade,
+    pointBorderWidth: def.shade === "transparent" ? 2 : 1,
+    pointRadius: 4,
+    pointHoverRadius: 6,
+    pointHoverBackgroundColor: "#ffffff",
+    pointHoverBorderColor: def.borderShade,
+    pointHoverBorderWidth: 2,
+  }));
+
+  // Area fill dataset (drawn first, behind dots)
+  const fillDataset = {
+    label: "_fill",
+    data: allData,
+    borderColor: "transparent",
+    backgroundColor: colors.bg,
+    pointRadius: 0,
+    pointHitRadius: 0,
+    showLine: true,
+    fill: true,
+    tension: 0.3,
+    borderWidth: 0,
+  };
+
   playerChart = new Chart(ctx, {
     type: "line",
     data: {
-      datasets: [
-        {
-          label: label + " Price (" + curr.label + ")",
-          data: chartData,
-          borderColor: colors.line,
-          backgroundColor: colors.bg,
-          pointBackgroundColor: colors.dot,
-          pointBorderColor: colors.dot,
-          pointRadius: 2.5,
-          pointHoverRadius: 4,
-          pointHoverBackgroundColor: "#ffffff",
-          pointHoverBorderColor: colors.dot,
-          pointHoverBorderWidth: 2,
-          borderWidth: 2,
-          fill: true,
-          tension: 0.1,
-        },
-      ],
+      datasets: [fillDataset, ...pointDatasets],
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      interaction: { intersect: false, mode: "index" },
+      interaction: { intersect: true, mode: "nearest" },
       plugins: {
-        legend: { display: false },
+        legend: {
+          display: true,
+          labels: {
+            color: "#1f521f",
+            font: { family: "'JetBrains Mono', monospace", size: 10 },
+            usePointStyle: true,
+            pointStyleWidth: 8,
+            boxHeight: 6,
+            filter: (item) => item.text !== "_fill",
+          },
+        },
         tooltip: {
           enabled: true,
           backgroundColor: "#0a0a0a",
@@ -886,24 +1019,31 @@ function renderPriceChart(sales, colors, label, currency) {
           bodyColor: "#33ff00",
           padding: 10,
           displayColors: false,
+          filter: (item) => item.dataset.label !== "_fill",
           callbacks: {
             title: function (items) {
-              const sale = sales[items[0].dataIndex];
-              return "> date: " + sale.date;
-            },
-            afterTitle: function (items) {
-              const sale = sales[items[0].dataIndex];
-              const serial = sale.serialNumber ? " #" + sale.serialNumber : "";
-              return "  card: " + (sale.cardSlug || "—") + serial;
+              const pt = items[0].raw;
+              const sale = pt._saleIdx != null ? sales[pt._saleIdx] : null;
+              if (!sale) return "";
+              return "> price: " + formatSalePrice(sale, currency);
             },
             label: function (item) {
-              const sale = sales[item.dataIndex];
-              return "  price: " + formatSalePrice(sale, currency);
-            },
-            afterLabel: function (item) {
-              const sale = sales[item.dataIndex];
-              const lines = ["  buyer: " + (sale.buyer || "—")];
-              if (sale.txType) lines.push("  type:  " + sale.txType);
+              const pt = item.raw;
+              const sale = pt._saleIdx != null ? sales[pt._saleIdx] : null;
+              if (!sale) return "";
+              const supply =
+                sale.supply || SCARCITY_SUPPLY[currentScarcity] || "?";
+              const serial = sale.serialNumber
+                ? sale.serialNumber + "/" + supply
+                : "—";
+              const season = formatSeasonYear(sale.seasonYear, sale.teamName);
+              const card =
+                serial !== "—" ? season + " (" + serial + ")" : season;
+              const lines = ["  date: " + sale.date, "  card: " + card];
+              if (sale.txType) lines.push("  type: " + sale.txType);
+              lines.push(
+                "  buyer: " + (sale.buyerDisplayName || sale.buyer || "—"),
+              );
               return lines;
             },
           },
@@ -1053,14 +1193,14 @@ function renderSalesTable(sales, currency, scarcity, colors) {
         sale.serialNumber != null
           ? `#${sale.serialNumber}/${totalSupply}`
           : "—";
-      const season = sale.seasonYear || "—";
+      const season = formatSeasonYear(sale.seasonYear, sale.teamName);
 
       return `
     <tr>
       <td>${sale.date}</td>
       <td style="color: ${colors.text};">${formatSalePrice(sale, currency)}</td>
       <td>${trunc(sale.buyerDisplayName || sale.buyer || "—", 25)}</td>
-      <td>${trunc(sale.sellerDisplayName || ((sale.txType === 'auction' || sale.txType === 'instant_buy') ? 'Sorare' : (sale.seller || '—')), 25)}</td>
+      <td>${trunc(sale.sellerDisplayName || (sale.txType === "auction" || sale.txType === "instant_buy" ? "Sorare" : sale.seller || "—"), 25)}</td>
       <td class="text-muted">${serial}</td>
       <td class="text-muted">${season}</td>
       <td class="text-muted">${sale.txType || "—"}</td>

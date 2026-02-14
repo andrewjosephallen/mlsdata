@@ -4,7 +4,42 @@
    ============================================================ */
 
 // --- MLS Season Config ---
-const MLS_INSEASON_YEAR = 2026;
+const MLS_CURRENT_YEAR = new Date().getFullYear();
+
+/**
+ * Check if a team name belongs to an MLS club.
+ */
+function isMLSTeam(teamName) {
+  return MLS_TEAM_NAMES.has(teamName);
+}
+
+/**
+ * Format season year for display.
+ * MLS teams: "2026" (single calendar year season)
+ * Non-MLS teams: "25/26" (cross-year European season)
+ */
+function formatSeasonYear(year, teamName) {
+  if (!year) return '—';
+  if (isMLSTeam(teamName)) return String(year);
+  const shortYear = String(year).slice(-2);
+  const nextShort = String(year + 1).slice(-2);
+  return shortYear + '/' + nextShort;
+}
+
+/**
+ * Check if a card's season is "in-season".
+ * MLS: in-season if seasonYear === current calendar year
+ * Non-MLS: in-season if seasonYear === currentYear, OR
+ *          seasonYear === currentYear - 1 AND we're before June
+ */
+function isInSeason(seasonYear, teamName) {
+  if (isMLSTeam(teamName)) {
+    return seasonYear === MLS_CURRENT_YEAR;
+  }
+  if (seasonYear === MLS_CURRENT_YEAR) return true;
+  if (seasonYear === MLS_CURRENT_YEAR - 1 && new Date().getMonth() < 5) return true;
+  return false;
+}
 
 // --- MLS Team Filter ---
 // Team names as returned by the API (used for filtering search results)

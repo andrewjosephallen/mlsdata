@@ -15,5 +15,3 @@
 - Super later
   - L15/L5/L10/L40 scores
   - Overall scores
-
-- Fix duplicate rows in sales table
